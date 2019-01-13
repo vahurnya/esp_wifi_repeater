@@ -138,6 +138,16 @@ typedef struct {
         uint8_t ota_host[64];
         uint16_t ota_port;
 #endif
+#ifdef COLLECTORCONTROL
+    uint8_t collector_start; //collector circulation enabled when this hour reached
+    uint8_t collector_stop; //collector circulation disabled when this hour reached
+#endif
+#ifdef DS18B20MONITOR
+    uint16 sensor_read_interval; //ds18b20 measurement in seconds
+    uint8_t sensor_report_http_host[128];   //hostname of the target web service
+    uint8_t sensor_report_url_path[128];    //target web service url with %s for temperature value
+#endif    
+
 } sysconfig_t, *sysconfig_p;
 
 int config_load(sysconfig_p config);

@@ -6,6 +6,13 @@
 #define		LOCAL_ACCESS 0x01
 #define		REMOTE_ACCESS 0x02
 
+#define COLLECTORCONTROL 1
+#define COLLECTORGPIO 15
+#define DS18B20MONITOR 1
+#define DS18B20_INTERVALSEC 300
+#define DEFAULT_sensor_report_url_path "/greenhouse/pump/temp-upload.php?T=%s"
+#define DEFAULT_sensor_report_http_host "www.somewebprovider.hu"
+
 #define		WIFI_SSID "ssid"
 #define		WIFI_PASSWORD "password"
 
@@ -26,7 +33,7 @@
 // Any value > 16 disables this feature
 // (I don't know of any that don't --AJK)
 //
-#define		STATUS_LED_GPIO 2
+#define		STATUS_LED_GPIO 92
 
 //
 // Defines the default GPIO pin for HW factory reset (when this GPIO is pulled low for more than 3 secs)
@@ -48,12 +55,12 @@
 // Define this to 1 to support the "sleep" command for power management and deep sleep
 // Requires a connection of GPIO16 and RST (probably not available on ESP01 modules)
 //
-#define		ALLOW_SLEEP 1
+#define		ALLOW_SLEEP 0
 
 //
 // Define this to 1 to support a daily traffic limit
 //
-#define		DAILY_LIMIT 0
+#define		DAILY_LIMIT 1
 
 //
 // Define this to support the setting of the WiFi PHY mode

@@ -63,6 +63,12 @@ uint32_t reg0, reg1, reg3;
     config->ap_on			= 1;
     config->ssid_hidden			= 0;
     config->max_clients			= MAX_CLIENTS;
+#ifdef DS18B20_INTERVALSEC
+    config->sensor_read_interval = DS18B20_INTERVALSEC;    
+    os_sprintf(config->sensor_report_http_host,"%s",  DEFAULT_sensor_report_http_host);
+    os_sprintf(config->sensor_report_url_path,"%s",  DEFAULT_sensor_report_url_path);
+#endif
+
 #if WPA2_PEAP
     config->use_PEAP			= 0;
     config->PEAP_identity[0]		= '\0';

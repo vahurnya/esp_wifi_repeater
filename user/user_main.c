@@ -55,6 +55,11 @@
 #include "mqtt.h"
 #endif
 
+#ifdef DS18B20MONITOR
+#include "tempsensor.h"
+#endif
+
+
 #define os_sprintf_flash(str, fmt, ...) do {	\
 	static const char flash_str[] ICACHE_RODATA_ATTR STORE_ATTR = fmt;	\
 	int flen = (sizeof(flash_str) + 4) & ~3;	\
@@ -81,6 +86,10 @@ int32_t client_watchdog_cnt;
 uint64_t Bytes_in, Bytes_out, Bytes_in_last, Bytes_out_last;
 uint32_t Packets_in, Packets_out, Packets_in_last, Packets_out_last;
 uint64_t t_old;
+
+#ifdef COLLECTORCONTROL
+bool collector_allowed=FALSE;
+#endif
 
 #if DAILY_LIMIT
 uint64_t Bytes_per_day;
@@ -977,6 +986,14 @@ void ICACHE_FLASH_ATTR console_handle_command(struct espconn *pespconn)
         os_sprintf_flash(response, "set phy_mode [1|2|3]\r\n");
         to_console(response);
 #endif
+#ifdef COLLECTORCONTROL
+        os_sprintf_flash(response, "set collector_start_hour|collector_stop_hour\r\n");
+        to_console(response);
+#endif
+#ifdef DS18B20MONITOR
+        os_sprintf_flash(response, "set sensor_read_intervalsec|sensor_http_host|sensor_url\r\n");
+        to_console(response);
+#endif
 #if ALLOW_SLEEP
         os_sprintf_flash(response, "sleep <secs>\r\nset [vmin|vmin_sleep] <val>\r\n");
         to_console(response);
@@ -1145,6 +1162,23 @@ void ICACHE_FLASH_ATTR console_handle_command(struct espconn *pespconn)
 		to_console(response);
 	}
 #endif
+
+#ifdef COLLECTORCONTROL
+	   os_sprintf(response, "Collector start hour: %d\r\n", config.collector_start);
+           to_console(response);
+	   os_sprintf(response, "Collector stop hour: %d\r\n", config.collector_stop);
+           to_console(response);
+#endif
+#ifdef DS18B20MONITOR
+       os_sprintf(response, "Temperature sensor reading interval in seconds %d\r\n",config.sensor_read_interval);
+       to_console(response);
+       os_sprintf(response, "Temperature sensor http host for reporting: %s\r\n",config.sensor_report_http_host);
+       to_console(response);
+       os_sprintf(response, "Temperature sensor http web service URL for reporting: %s\r\n",config.sensor_report_url_path);
+       to_console(response);
+#endif
+
+
 	goto command_handled_2;
       }
 
@@ -1184,6 +1218,22 @@ void ICACHE_FLASH_ATTR console_handle_command(struct espconn *pespconn)
 #endif
 	   os_sprintf(response, "Free mem: %d\r\n", system_get_free_heap_size());
 	   to_console(response);
+
+#ifdef COLLECTORCONTROL
+       os_sprintf(response, "Collector pump is %s.\r\n",collector_allowed?"enabled":"disabled");
+   	   to_console(response);    
+#endif
+
+
+#ifdef DS18B20MONITOR
+       os_sprintf(response, "Temperature sensor is %sfound.\r\n",ds18b20devfound?"":"not ");
+   	   to_console(response);
+       if (ds18b20devfound)
+       {
+           os_sprintf(response, "Last measured temperature: %d.%04d\r\n",rr/10000,abs(rr)%10000);
+       	   to_console(response);
+       }
+#endif
 
 	   if (connected) {
 		uint8_t buf[20];
@@ -2207,6 +2257,45 @@ void ICACHE_FLASH_ATTR console_handle_command(struct espconn *pespconn)
         	goto command_handled;
 	    }
 
+#ifdef COLLECTORCONTROL
+	    if (strcmp(tokens[1], "collector_start_hour") == 0)
+	    {
+		uint8_t collector_start = atoi(tokens[2]);
+	    config.collector_start = collector_start;
+		os_sprintf(response, "Collector start hour updated %d\r\n",collector_start);
+          	goto command_handled;
+	    }
+
+	    if (strcmp(tokens[1], "collector_stop_hour") == 0)
+	    {
+		uint8_t collector_stop = atoi(tokens[2]);
+	    config.collector_stop = collector_stop;
+		os_sprintf(response, "Collector stop hour updated %d\r\n",collector_stop);
+          	goto command_handled;
+	    }
+#endif
+
+#ifdef DS18B20MONITOR
+	    if (strcmp(tokens[1], "sensor_read_intervalsec") == 0)
+	    {
+            config.sensor_read_interval = atoi(tokens[2]);
+            os_sprintf(response, "Temperature sensor interval updated to %d seconds\r\n",(config.sensor_read_interval));
+                goto command_handled;
+	    }
+	    if (strcmp(tokens[1], "sensor_http_host") == 0)
+        {
+            os_sprintf(config.sensor_report_http_host, "%s", tokens[2]);
+            os_sprintf(response, "Temperature sensor http host updated to: %s\r\n",config.sensor_report_http_host);
+            goto command_handled;
+        }
+	    if (strcmp(tokens[1], "sensor_url") == 0)
+        {
+            os_sprintf(config.sensor_report_url_path, "%s", tokens[2]);
+            os_sprintf(response, "Temperature sensor http web service URL updated to: %s\r\n",config.sensor_report_url_path);
+            goto command_handled;
+        }
+#endif
+
 	    if (strcmp(tokens[1], "status_led") == 0)
 	    {
 	    	if (config.status_led <= 16) {
@@ -2925,6 +3014,59 @@ uint32_t Bps;
 	if (token_bucket_us > MAX_TOKEN_RATIO*Bps) token_bucket_us = MAX_TOKEN_RATIO*Bps;
     }
     t_old_tb = t_new;
+#endif
+
+#ifdef COLLECTORCONTROL
+#ifdef DAILY_LIMIT
+	   uint32_t current_stamp = sntp_get_current_timestamp();	   
+       if (current_stamp)
+       {
+            struct tm
+            {
+                int	tm_sec;
+                int	tm_min;
+                int	tm_hour;
+                int	tm_mday;
+                int	tm_mon;
+                int	tm_year;
+                int	tm_wday;
+                int	tm_yday;
+                int	tm_isdst;
+            };
+            struct tm * tim_p;
+            tim_p=(struct tm *)sntp_localtime(&current_stamp);           
+            if ( ((config.collector_start > config.collector_stop) &&
+                  (
+                    (tim_p->tm_hour >= config.collector_start) ||
+                    (tim_p->tm_hour < config.collector_stop)
+                  )
+                 ) ||
+                  (
+                    (tim_p->tm_hour >= config.collector_start) &&
+                    (tim_p->tm_hour < config.collector_stop)
+                  )
+            )
+            {
+                collector_allowed=TRUE;
+            } else
+            {
+                collector_allowed=FALSE;
+            }
+       }
+       else
+       {
+           collector_allowed=FALSE;
+       }
+       easygpio_pinMode(COLLECTORGPIO, EASYGPIO_NOPULL, EASYGPIO_OUTPUT);
+       if (collector_allowed)
+       {
+		   easygpio_outputSet (COLLECTORGPIO, 1);
+       }
+       else
+       {
+		   easygpio_outputSet (COLLECTORGPIO, 0);        
+       }
+#endif
 #endif
 
 #if MQTT_CLIENT
@@ -3703,6 +3845,18 @@ struct espconn *pCon;
     sntp_setservername(1, "2.pool.ntp.org");
     sntp_set_timezone(config.ntp_timezone);
     sntp_init();
+#endif
+
+#ifdef DS18B20MONITOR
+    os_printf("Initializing ds18b20 modules.\n");
+    sensor_read_interval=config.sensor_read_interval;
+    os_strcpy(sensor_host,config.sensor_report_http_host);
+    os_strcpy(sensor_url,config.sensor_report_url_path);
+
+//    os_printf(,"%s",config.sensor_report_http_host);
+//    os_printf(sensor_url,"%s",config.sensor_report_url_path);
+    init_tempsensor();
+    os_printf("ds18b20 module initialization done.\n");
 #endif
 
     // Start the timer
