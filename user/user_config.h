@@ -33,7 +33,7 @@
 // Any value > 16 disables this feature
 // (I don't know of any that don't --AJK)
 //
-#define		STATUS_LED_GPIO 92
+#define		STATUS_LED_GPIO 2
 
 //
 // Defines the default GPIO pin for HW factory reset (when this GPIO is pulled low for more than 3 secs)
