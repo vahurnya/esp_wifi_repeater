@@ -1,7 +1,7 @@
 #ifndef _USER_CONFIG_
 #define _USER_CONFIG_
 
-#define		ESP_REPEATER_VERSION "V2.2.4"
+#define		ESP_REPEATER_VERSION "V2.2.15"
 
 #define		LOCAL_ACCESS 0x01
 #define		REMOTE_ACCESS 0x02
@@ -25,7 +25,7 @@
 //
 // Size of the console buffers
 //
-#define		MAX_CON_SEND_SIZE 1300
+#define		MAX_CON_SEND_SIZE 1500
 #define		MAX_CON_CMD_SIZE 80
 
 //
@@ -123,7 +123,7 @@
 //
 #define		MQTT_CLIENT 1
 
-#define		MQTT_BUF_SIZE 1024
+#define		MQTT_BUF_SIZE 2048
 #define		MQTT_KEEPALIVE 120  /*seconds*/
 #define		MQTT_RECONNECT_TIMEOUT 5 /*seconds*/
 #define		PROTOCOL_NAMEv31 /*MQTT version 3.1 compatible with Mosquitto v0.15*/
@@ -160,6 +160,11 @@
 // Undefine it, if you have no HW-RESET
 //
 #define		ENC28J60_HW_RESET 4
+
+//
+// Define this to 1 if you want to be able to control GPIO pins from the command line
+//
+#define		GPIO_CMDS 1
 
 // Internal
 

@@ -14,13 +14,22 @@
 #include "user_config.h"
 #include "acl.h"
 
-#define FLASH_BLOCK_NO 0x60
+#define FLASH_BLOCK_NO 0x68
 
-#define MAGIC_NUMBER    0x13f43ddc
+#define MAGIC_NUMBER    0x6e2dc510
 
 typedef enum {
         AUTOMESH_OFF = 0, AUTOMESH_LEARNING, AUTOMESH_OPERATIONAL
 } automeshmode;
+
+#if GPIO_CMDS
+typedef enum {
+        UNDEFINED = 0, OUT, IN, IN_PULLUP
+} gpio_mode;
+typedef enum {
+        NONE = 0, MONOSTABLE_NO, MONOSTABLE_NC, BISTABLE_NO, BISTABLE_NC
+} gpio_trigger_type;
+#endif
 
 typedef struct {
         // To check if the structure is initialized or not in flash
@@ -32,7 +41,7 @@ typedef struct {
 
         /* Below variables are specific to my code */
         uint8_t ssid[32]; // SSID of the AP to connect to
-        uint8_t password[64]; // Password of the network
+        uint8_t password[65]; // Password of the network
         uint8_t auto_connect; // Should we auto connect
         uint8_t bssid[6]; // Optional: BSSID the AP
         uint8_t sta_hostname[32]; // Name of the station
@@ -47,9 +56,9 @@ typedef struct {
         uint8_t use_PEAP; // WPA2 PEAP Authentication
         uint8_t PEAP_identity[64]; // PEAP enterprise outer identity
         uint8_t PEAP_username[64]; // PEAP enterprise username
-        uint8_t PEAP_password[32]; // PEAP enterprise password
+        uint8_t PEAP_password[64]; // PEAP enterprise password
 #endif
-        uint8_t lock_password[32]; // Password of config lock
+        uint8_t lock_password[64]; // Password of config lock
         uint8_t locked; // Should we allow for config changes
 
         int32_t ap_watchdog; // Seconds without ap traffic will cause reset (-1 off, default)
@@ -62,7 +71,9 @@ typedef struct {
         uint32_t am_scan_time; // Seconds for scanning
         uint32_t am_sleep_time; // Seconds for sleeping
 
-        uint8_t nat_enable; // Enable NAT on the AP netif;
+        uint8_t nat_enable; // Enable NAT on the AP netif
+        uint32_t max_nat;   // Max number of NAT entires
+        uint32_t max_portmap;   // Max number of portmaps
 	uint32_t tcp_timeout; // NAT timeout of TCP connections
 	uint32_t udp_timeout; // NAT timeout of UDO 'connections'
 
@@ -107,6 +118,7 @@ typedef struct {
         uint8_t mqtt_prefix[64]; // Topic-prefix
         uint8_t mqtt_command_topic[64]; // Topic on which commands are received, "none" if not subscibed
         uint8_t mqtt_gpio_out_topic[64]; // Topic on which the status of the gpio_out pin can be set
+        uint8_t mqtt_qos;
         bool gpio_out_status; // Initial status of the gpio_out pin
 
         uint32_t mqtt_interval; // Interval in secs for status messages, 0 means no messages
@@ -138,6 +150,11 @@ typedef struct {
         uint8_t ota_host[64];
         uint16_t ota_port;
 #endif
+#if GPIO_CMDS
+        gpio_mode gpiomode[17];
+        gpio_trigger_type gpio_trigger_type[17];
+        uint8_t gpio_trigger_pin[17];
+#endif
 #ifdef COLLECTORCONTROL
     uint8_t collector_start; //collector circulation enabled when this hour reached
     uint8_t collector_stop; //collector circulation disabled when this hour reached
@@ -146,8 +163,7 @@ typedef struct {
     uint16 sensor_read_interval; //ds18b20 measurement in seconds
     uint8_t sensor_report_http_host[128];   //hostname of the target web service
     uint8_t sensor_report_url_path[128];    //target web service url with %s for temperature value
-#endif    
-
+#endif   
 } sysconfig_t, *sysconfig_p;
 
 int config_load(sysconfig_p config);

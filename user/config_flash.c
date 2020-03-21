@@ -1,5 +1,6 @@
 #include "user_interface.h"
 #include "lwip/ip.h"
+#include "lwip/lwip_napt.h"
 #include "config_flash.h"
 
 
@@ -39,6 +40,7 @@ uint32_t reg0, reg1, reg3;
 	mac[2] = 0x74;
     } else {
 	os_printf("MAC read error\r\n");
+
     }
     mac[3] = (reg1 >> 8) & 0xff;
     mac[4] = reg1 & 0xff;
@@ -46,6 +48,7 @@ uint32_t reg0, reg1, reg3;
 
     //os_printf("%02x:%02x:%02x\r\n", reg0, reg1, reg3);
     //os_printf("STA: %02x:%02x:%02x:%02x:%02x:%02x\r\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    //os_printf("Config block: %d\r\n", sizeof(sysconfig_t));
 
     os_memcpy(config->STA_MAC_address, mac, 6);
     mac[0] |= 0x02;
@@ -89,6 +92,8 @@ uint32_t reg0, reg1, reg3;
     config->am_sleep_time		= 0;
 
     config->nat_enable			= 1;
+    config->max_nat			    = IP_NAPT_MAX;
+    config->max_portmap	        = IP_PORTMAP_MAX;
     config->tcp_timeout			= 0;  // use default
     config->udp_timeout			= 0;  // use default
 
@@ -132,6 +137,7 @@ uint32_t reg0, reg1, reg3;
     os_sprintf(config->mqtt_prefix,"%s/%s/system", MQTT_PREFIX, config->mqtt_id);
     os_sprintf(config->mqtt_command_topic,"%s/%s/%s", MQTT_PREFIX, config->mqtt_id, "command");
     os_sprintf(config->mqtt_gpio_out_topic,"%s/%s/%s", MQTT_PREFIX, config->mqtt_id, "switch");
+    config->mqtt_qos            = 0;
     config->gpio_out_status		= 0;
     config->mqtt_interval		= MQTT_REPORT_INTERVAL;
     config->mqtt_topic_mask		= 0xffff;
@@ -165,6 +171,15 @@ uint32_t reg0, reg1, reg3;
     os_sprintf(config->ota_host,"%s", "none");
     config->ota_port			= 80;
 #endif
+#if GPIO_CMDS
+    int i;
+    for (i=0; i<17; i++)
+    {
+        config->gpiomode[i] = UNDEFINED;
+        config->gpio_trigger_pin[i] = -1;
+        config->gpio_trigger_type[i] = NONE;
+    }
+#endif
 }
 
 int ICACHE_FLASH_ATTR config_load(sysconfig_p config)
@@ -181,12 +196,13 @@ int ICACHE_FLASH_ATTR config_load(sysconfig_p config)
         config_save(config);
         return -1;
     }
-
-    os_printf("\r\nConfig found and loaded\r\n");
     spi_flash_read(base_address * SPI_FLASH_SEC_SIZE, (uint32 *) config, sizeof(sysconfig_t));
+
+    os_printf("\r\nConfig found and loaded (%d Bytes)\r\n", config->length);
+
     if (config->length != sizeof(sysconfig_t))
     {
-        os_printf("Length Mismatch, probably old version of config, loading defaults\r\n");
+        os_printf("Length Mismatch (should be %d), probably old version of config, loading defaults\r\n", sizeof(sysconfig_t));
         config_load_default(config);
         config_save(config);
 	return -1;
@@ -300,3 +316,81 @@ void user_rf_pre_init() {
     }*/
   }
 }
+/*
+// user_pre_init is required from SDK v3.0.0 onwards
+// It is used to register the parition map with the SDK, primarily to allow
+// the app to use the SDK's OTA capability.  We don't make use of that in 
+// otb-iot and therefore the only info we provide is the mandatory stuff:
+// - RF calibration data
+// - Physical data
+// - System parameter
+// The location and length of these are from the 2A SDK getting started guide
+void ICACHE_FLASH_ATTR user_pre_init(void)
+{
+  bool rc = false;
+  static const partition_item_t part_table[] = 
+  {
+    {SYSTEM_PARTITION_RF_CAL,
+     0x3fb000,
+     0x1000},
+    {SYSTEM_PARTITION_PHY_DATA,
+     0x3fc000,
+     0x1000},
+    {SYSTEM_PARTITION_SYSTEM_PARAMETER,
+     0x3fd000,
+     0x3000},
+  };
+/*
+  enum flash_size_map size_map = system_get_flash_size_map();
+  uint32 rf_cal_sec = 0, addr, i;
+  //os_printf("\nUser preinit: ");
+   switch (size_map) {
+      case FLASH_SIZE_4M_MAP_256_256:
+         rf_cal_sec = 128 - 5;
+         break;
+
+      case FLASH_SIZE_8M_MAP_512_512:
+         rf_cal_sec = 256 - 5;
+         break;
+
+      case FLASH_SIZE_16M_MAP_512_512:
+      case FLASH_SIZE_16M_MAP_1024_1024:
+         rf_cal_sec = 512 - 5;
+         break;
+
+      case FLASH_SIZE_32M_MAP_512_512:
+      case FLASH_SIZE_32M_MAP_1024_1024:
+         rf_cal_sec = 1024 - 5;
+         break;
+
+      default:
+         rf_cal_sec = 0;
+         break;
+   }
+
+    static const partition_item_t part_table[] = 
+    {
+        {SYSTEM_PARTITION_RF_CAL,
+        rf_cal_sec * 0x1000,
+        0x1000},
+        {SYSTEM_PARTITION_PHY_DATA,
+        (rf_cal_sec + 1) * 0x1000,
+        0x1000},
+        {SYSTEM_PARTITION_SYSTEM_PARAMETER,
+        (rf_cal_sec + 2) * 0x1000,
+        0x3000},
+    };
+
+  // This isn't an ideal approach but there's not much point moving on unless
+  // or until this has succeeded cos otherwise the SDK will just barf and 
+  // refuse to call user_init()
+  while (!rc)
+  {
+    rc = system_partition_table_regist(part_table,
+				       sizeof(part_table)/sizeof(part_table[0]),
+                                       4);
+  }
+
+  return;
+}
+*/
